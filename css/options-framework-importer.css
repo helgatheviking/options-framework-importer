@@ -1,0 +1,29 @@
+/* Top icon */
+
+#icon-settings, #icon-import-export {
+    background-attachment: scroll;
+    background-clip: border-box;
+    background-color: transparent;
+    background-origin: padding-box;
+    background-repeat: no-repeat;
+    background-size: auto auto;
+}
+
+#icon-import-export {
+    background-image: url("../images/import-export32.png");
+}
+
+
+/* Backup Settings */
+
+.import, .export {
+	margin: 20px 0;
+	padding: 0 0 20px 10px;
+	border: 1px solid #ECECEC;
+	background-color: #f9f9f9;
+}
+
+.import label {
+	display:block;
+	padding: 0 0 5px 0;
+}
