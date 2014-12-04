@@ -1,118 +1,73 @@
-# Copyright (C) 2013 Options Framework Backup
-# This file is distributed under the same license as the Options Framework Backup package.
+# Copyright (C) 2014 Kathy Darling
+# This file is distributed under the GNU General Public License v3.0.
 msgid ""
 msgstr ""
-"Project-Id-Version: Options Framework Backup 1.0\n"
-"Report-Msgid-Bugs-To: http://wordpress.org/tag/options-framework-importer\n"
-"POT-Creation-Date: 2013-07-17 18:26:29+00:00\n"
+"Project-Id-Version: Options Framework Import/Export 2.0\n"
+"Report-Msgid-Bugs-To: "
+"http://wordpress.org/support/plugin/options-framework-importer\n"
+"POT-Creation-Date: 2014-12-04 22:06:08+00:00\n"
 "MIME-Version: 1.0\n"
-"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"PO-Revision-Date: 2013-MO-DA HO:MI+ZONE\n"
+"PO-Revision-Date: 2014-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
+"X-Generator: grunt-wp-i18n 0.4.9\n"
 
-#: options-framework-importer.php:106
-msgid "OptionsFramework Import / Export"
+#: options-framework-importer.php:76 options-framework-importer.php:84
+msgid "Cheatin&#8217; huh?"
 msgstr ""
 
-#: options-framework-importer.php:106
-msgid "Import / Export Options"
+#: options-framework-importer.php:131
+msgid "Import/Export"
 msgstr ""
 
-#: options-framework-importer.php:151
-msgid "Import / Export"
-msgstr ""
-
-#: options-framework-importer.php:154
+#: options-framework-importer.php:135
 msgid "Import Settings"
 msgstr ""
 
-#: options-framework-importer.php:156
-msgid "If you have settings in a backup file on your computer, the Import / Export system can import those into this site. To get started, upload your backup file to import from below."
-msgstr ""
-
-#: options-framework-importer.php:160
-msgid "Upload File: (Maximum Size: %s)"
-msgstr ""
-
-#: options-framework-importer.php:163
-msgid "Upload File and Import"
-msgstr ""
-
-#: options-framework-importer.php:169
+#: options-framework-importer.php:141
 msgid "Export Settings"
 msgstr ""
 
-#: options-framework-importer.php:171
-msgid "When you click the button below, the Import / Export system will create a text file for you to save to your computer."
+#: options-framework-importer.php:142
+msgid "Select all and copy to export your settings."
 msgstr ""
 
-#: options-framework-importer.php:172
-msgid "This text file can be used to restore your settings here on \"%s\", or to easily setup another website with the same settings\"."
+#: options-framework-importer.php:165
+msgid ""
+"Paste your exported settings here. When you click \"Import\" your settings "
+"will be imported to this site."
 msgstr ""
 
-#: options-framework-importer.php:177
-msgid "Download Export File"
+#: options-framework-importer.php:166
+msgid "Import"
 msgstr ""
 
-#: options-framework-importer.php:199
-msgid "Welcome to the OptionsFramework Backup Manager."
+#: options-framework-importer.php:167
+msgid "Click OK to import. All current theme settings will be overwritten!"
 msgstr ""
 
-#: options-framework-importer.php:200
-msgid "Here are a few notes on using this screen."
+#: options-framework-importer.php:192
+msgid ""
+"ERROR! You don't have any options to export. Trying saving your options "
+"first."
 msgstr ""
 
-#: options-framework-importer.php:201
-msgid "The backup manager allows you to backup or restore your \"Theme Options\" and other settings to or from a text file."
+#: options-framework-importer.php:265
+msgid "Options imported."
 msgstr ""
 
-#: options-framework-importer.php:202
-msgid "To create a backup, simply select the setting type you'd like to backup (or \"All Settings\") and hit the \"Download Export File\" button."
+#: options-framework-importer.php:267
+msgid "Options could not be imported."
 msgstr ""
 
-#: options-framework-importer.php:203
-msgid "To restore your settings from a backup, browse your computer for the file (under the \"Import Settings\" heading) and hit the \"Upload File and Import\" button. This will restore only the settings that have changed since the backup."
-msgstr ""
-
-#: options-framework-importer.php:205
-msgid "Please note that only valid backup files generated through the OptionsFramework Backup Manager should be imported."
-msgstr ""
-
-#: options-framework-importer.php:207
-msgid "Looking for assistance?"
-msgstr ""
-
-#: options-framework-importer.php:208
-msgid "Please post your query on the %sOptionsFramework Support Forums%s where we will do our best to assist you further."
-msgstr ""
-
-#: options-framework-importer.php:228
-msgid "Please note that this backup manager backs up only your theme settings and not your content. To backup your content, please use the %sWordPress Export Tool%s."
-msgstr ""
-
-#: options-framework-importer.php:231
-msgid "There was a problem importing your settings. Please Try again."
-msgstr ""
-
-#: options-framework-importer.php:233
-msgid "There was a problem exporting your settings. Please Try again."
-msgstr ""
-
-#: options-framework-importer.php:235
-msgid "The import file you've provided is invalid. Please try again."
-msgstr ""
-
-#: options-framework-importer.php:237
-msgid "Settings successfully imported. | Return to %sTheme Options%s"
-msgstr ""
 #. Plugin Name of the plugin/theme
-msgid "Options Framework Backup"
+msgid "Options Framework Import/Export"
 msgstr ""
 
 #. Description of the plugin/theme
-msgid "Backup your \"Theme Options\" to a downloadable text file."
+msgid "Import/Export your \"Options Framework Theme Options\" via copy and paste"
 msgstr ""
 
 #. Author of the plugin/theme
