@@ -1,13 +1,13 @@
 <?php
 /*
-Plugin Name: Options Framework Backup
+Plugin Name: Options Framework Import/Export
 Plugin URI:
-Description: Backup your "Theme Options" to a downloadable text file.
-Version: 1.0
+Description: Import/Export your "Options Framework Theme Options" via copy and paste
+Version: 2.0
 Author: Kathy Darling
 Author URI: http://kathyisawesome.com
-Requires at least: 3.5.1
-Tested up to: 3.5.1
+Requires at least: 4.0
+Tested up to: 4.0.1
 
 
 Plugin version of the Options Framework Fork by Gilles Vauvarin
@@ -27,351 +27,264 @@ if ( ! function_exists( 'is_admin' ) ) {
     exit();
 }
 
-/*
- * -----------------------------------------------------------------------------------
 
- TABLE OF CONTENTS
 
- - var $admin_page
- - var $token
+// only run if OF is active
+$active_plugins = (array) get_option( 'active_plugins', array() );
 
- - function OptionsFramework_Backup () 						// Constructor
- - function init () 										// Initialize the class.
- - function register_admin_screen () 						// Register the admin screen within WordPress.
- - function admin_screen () 								// Load the admin screen.
- - function admin_screen_help ()							// Add contextual help to the admin screen.
- - function admin_notices() 								// Display admin notices when performing backup/restore.
- - function admin_screen_logic ()							// The processing code to generate the backup or restore from a previous backup.
- - function import ()										// Import settings from a backup file.
- - function export ()										// Export settings to a backup file.
- - function construct_database_query ()						// Constructs the database query based on the export type.
+if ( is_multisite() )
+	$active_plugins = array_merge( $active_plugins, get_site_option( 'active_sitewide_plugins', array() ) );
 
- - Create $of_backup Object
------------------------------------------------------------------------------------*/
+if( ! in_array( 'options-framework/options-framework.php', $active_plugins ) && ! array_key_exists( 'options-framework/options-framework.php', $active_plugins ) )
+	return;
 
-if ( ! class_exists( "OptionsFramework_Backup" ) ) :
+if ( ! class_exists( 'OF_Import_Export' ) ) :
 
-class OptionsFramework_Backup {
-
-	var $admin_page;
-	var $token;
-
-	function OptionsFramework_Backup () {
-		$this->admin_page = '';
-		$this->token = 'options-backup';
-	} // End Constructor
+class OF_Import_Export {
 
 	/**
-	 * init()
-	 *
-	 * Initialize the class.
-	 *
-	 * @since 1.0.0
+	 * @var OF_Import_Export - the single instance of the class
 	 */
-
-	function init () {
-		if ( is_admin() ) {
-			// Register the admin screen.
-			add_action( 'admin_menu', array( $this, 'register_admin_screen' ), 20 );
-
-			add_action( 'admin_init', array( $this,'load_text_domain'));
-
-		}
-
-
-	} // End init()
-
-    /**
-     * Make Plugin Translation-ready
-     * @since 1.0
-     */
-
-    function load_text_domain() {
-        load_plugin_textdomain( 'options-framework-importer', false, dirname( plugin_basename( __FILE__ ) ) . '/languages/' );
-    }
-
-    /**
-	 * register_admin_screen()
-	 *
-	 * Register the admin screen within WordPress.
-	 *
-	 * @since 1.0.0
-	 */
-
-	function register_admin_screen () {
-
-		// only add backup page if OF is active
-		if ( ! is_plugin_active( 'options-framework/options-framework.php' ) ) return;
-
-		$this->admin_page = add_theme_page( __( 'OptionsFramework Import / Export', 'options-framework-importer' ), __( 'Import / Export Options', 'options-framework-importer' ), 'manage_options', $this->token, array( $this, 'admin_screen' ) );
-
-		// Adds actions to hook in the required css and javascript
-		add_action("admin_print_styles-$this->admin_page", array( $this, 'optionsframework_load_adminstyles' ) );
-
-		// Admin screen logic.
-		add_action( 'load-' . $this->admin_page, array( $this, 'admin_screen_logic' ) );
-
-		// Add contextual help.
-		add_action( 'contextual_help', array( $this, 'admin_screen_help' ), 10, 3 );
-
-		add_action( 'admin_notices', array( $this, 'admin_notices' ), 10 );
-
-	} // End register_admin_screen()
+	protected static $_instance = null;
 
 	/**
-	 * optionsframework_load_adminstyles()
-	 *
-	 * Load the CSS
-	 *
-	 * @since 1.0.0
+	 * variables
 	 */
-		function optionsframework_load_adminstyles() {
-			wp_enqueue_style('of-importer', plugins_url( '/css/options-framework-importer.css', __FILE__ ) );
+	private $of_options;
+	private $theme_options;
+
+	/**
+	 * Main OF_Import_Export instance.
+	 *
+	 * Ensures only one instance of OF_Import_Export is loaded or can be loaded
+	 *
+	 * @static
+	 * @return OF_Import_Export - Main instance
+	 */
+	public static function instance() {
+		if ( is_null( self::$_instance ) ) {
+			self::$_instance = new self();
 		}
+		return self::$_instance;
+	}
 
 
 	/**
-	 * admin_screen()
-	 *
-	 * Load the admin screen.
-	 *
-	 * @since 1.0.0
+	 * Cloning is forbidden.
 	 */
-
-	function admin_screen () {
-
-		$export_type = 'all';
-
-		if ( isset( $_POST['export-type'] ) ) {
-			$export_type = esc_attr( $_POST['export-type'] );
-		}
-?>
-	<div class="wrap">
-		<?php echo get_screen_icon( $screen = 'import-export' ); ?>
-		<h2><?php _e( 'Import / Export' ); ?></h2>
-
-		<div class="import">
-			<h3><?php _e( 'Import Settings' ); ?></h3>
-
-			<p><?php _e( 'If you have settings in a backup file on your computer, the Import / Export system can import those into this site. To get started, upload your backup file to import from below.' ); ?></p>
-
-				<form enctype="multipart/form-data" method="post" action="<?php echo admin_url( 'admin.php?page=' . $this->token ); ?>">
-					<?php wp_nonce_field( 'OptionsFramework-backup-import' ); ?>
-					<label for="OptionsFramework-import-file"><?php printf( __( 'Upload File: (Maximum Size: %s)' ), ini_get( 'post_max_size' ) ); ?></label>
-					<input type="file" id="OptionsFramework-import-file" name="OptionsFramework-import-file" size="25" />
-					<input type="hidden" name="OptionsFramework-backup-import" value="1" />
-					<input type="submit" class="button" value="<?php _e( 'Upload File and Import' ); ?>" />
-				</form>
-
-		</div>
-
-		<div class="export">
-			<h3><?php _e( 'Export Settings' ); ?></h3>
-
-			<p><?php _e( 'When you click the button below, the Import / Export system will create a text file for you to save to your computer.' ); ?></p>
-			<p><?php echo sprintf( __( 'This text file can be used to restore your settings here on "%s", or to easily setup another website with the same settings".' ), get_bloginfo( 'name' ) ); ?></p>
-
-			<form method="post" action="<?php echo admin_url( 'admin.php?page=' . $this->token ); ?>">
-				<?php wp_nonce_field( 'OptionsFramework-backup-export' ); ?>
-				<input type="hidden" name="OptionsFramework-backup-export" value="1" />
-				<input type="submit" class="button" value="<?php _e( 'Download Export File', 'options-framework-importer' ); ?>" />
-			</form>
-		</div>
-
-	</div><!--/.wrap-->
-<?php
-
-	} // End admin_screen()
-
-	/**
-	 * admin_screen_help()
-	 *
-	 * Add contextual help to the admin screen.
-	 *
-	 * @since 1.0.0
-	 */
-
-	function admin_screen_help ( $contextual_help, $screen_id, $screen ) {
-
-		if ( $this->admin_page == $screen->id ) {
-
-		$contextual_help =
-		  '<h3>' . __( 'Welcome to the OptionsFramework Backup Manager.' ) . '</h3>' .
-		  '<p>' . __( 'Here are a few notes on using this screen.' ) . '</p>' .
-		  '<p>' . __( 'The backup manager allows you to backup or restore your "Theme Options" and other settings to or from a text file.' ) . '</p>' .
-		  '<p>' . __( 'To create a backup, simply select the setting type you\'d like to backup (or "All Settings") and hit the "Download Export File" button.' ) . '</p>' .
-		  '<p>' . __( 'To restore your settings from a backup, browse your computer for the file (under the "Import Settings" heading) and hit the "Upload File and Import" button. This will restore only the settings that have changed since the backup.' ) . '</p>' .
-
-		  '<p><strong>' . __( 'Please note that only valid backup files generated through the OptionsFramework Backup Manager should be imported.' ) . '</strong></p>' .
-
-		  '<p><strong>' . __( 'Looking for assistance?' ) . '</strong></p>' .
-		  '<p>' . sprintf( __( 'Please post your query on the %sOptionsFramework Support Forums%s where we will do our best to assist you further.' ), '<a href="http://www.OptionsFramework.com/support=forum/" target="_blank">', '</a>' ) . '</p>';
-
-		} // End IF Statement
-
-		return $contextual_help;
-
-	} // End admin_screen_help()
-
-	/**
-	 * admin_notices()
-	 *
-	 * Display admin notices when performing backup/restore.
-	 *
-	 * @since 1.0.0
-	 */
-
-	function admin_notices () {
-
-		if ( ! isset( $_GET['page'] ) || ( $_GET['page'] != $this->token ) ) { return; }
-
-		echo '<div id="import-notice" class="updated"><p>' . sprintf( __( 'Please note that this backup manager backs up only your theme settings and not your content. To backup your content, please use the %sWordPress Export Tool%s.', 'options-framework-importer' ), '<a href="' . admin_url( 'export.php' ) . '">', '</a>' ) . '</p></div><!--/#import-notice .message-->' . "\n";
-
-		if ( isset( $_GET['error'] ) && $_GET['error'] == 'true' ) {
-			echo '<div id="message" class="error"><p>' . __( 'There was a problem importing your settings. Please Try again.' ) . '</p></div>';
-		} else if ( isset( $_GET['error-export'] ) && $_GET['error-export'] == 'true' ) {
-			echo '<div id="message" class="error"><p>' . __( 'There was a problem exporting your settings. Please Try again.' ) . '</p></div>';
-		} else if ( isset( $_GET['invalid'] ) && $_GET['invalid'] == 'true' ) {
-			echo '<div id="message" class="error"><p>' . __( 'The import file you\'ve provided is invalid. Please try again.' ) . '</p></div>';
-		} else if ( isset( $_GET['imported'] ) && $_GET['imported'] == 'true' ) {
-			echo '<div id="message" class="updated"><p>' . sprintf( __( 'Settings successfully imported. | Return to %sTheme Options%s', 'options-framework-importer' ), '<a href="' . admin_url( 'admin.php?page=options-framework' ) . '">', '</a>' ) . '</p></div>';
-		} // End IF Statement
-
-	} // End admin_notices()
-
-	/**
-	 * admin_screen_logic()
-	 *
-	 * The processing code to generate the backup or restore from a previous backup.
-	 *
-	 * @since 1.0.0
-	 */
-
-	function admin_screen_logic () {
-
-		if ( ! isset( $_POST['OptionsFramework-backup-export'] ) && isset( $_POST['OptionsFramework-backup-import'] ) && ( $_POST['OptionsFramework-backup-import'] == true ) ) {
-			$this->import();
-		}
-
-		if ( ! isset( $_POST['OptionsFramework-backup-import'] ) && isset( $_POST['OptionsFramework-backup-export'] ) && ( $_POST['OptionsFramework-backup-export'] == true ) ) {
-			$this->export();
-		}
-
-	} // End admin_screen_logic()
-
+	public function __clone() {
+		_doing_it_wrong( __FUNCTION__, __( 'Cheatin&#8217; huh?' ) );
+	}
 
 
 	/**
-	 * import()
-	 *
-	 * Import settings from a backup file.
-	 *
-	 * @since 1.0.0
+	 * Unserializing instances of this class is forbidden.
 	 */
+	public function __wakeup() {
+		_doing_it_wrong( __FUNCTION__, __( 'Cheatin&#8217; huh?' ) );
+	}
 
 
-
-	function import() {
-		check_admin_referer( 'OptionsFramework-backup-import' ); // Security check.
-
-		if ( ! isset( $_FILES['OptionsFramework-import-file'] ) ) { return; } // We can't import the settings without a settings file.
-
-		// Extract file contents
-		$upload = file_get_contents( $_FILES['OptionsFramework-import-file']['tmp_name'] );
-
-		// Decode the JSON from the uploaded file
-		$datafile = json_decode( $upload, true );
-
-		// Check for errors
-		if ( ! $datafile || $_FILES['OptionsFramework-import-file']['error'] ) {
-			wp_redirect( admin_url( 'admin.php?page=' . $this->token . '&error=true' ) );
-			exit;
-		}
-
-		// Make sure this is a valid backup file.
-		if ( ! isset( $datafile['OptionsFramework-backup-validator'] ) ) {
-			wp_redirect( admin_url( 'admin.php?page=' . $this->token . '&invalid=true' ) );
-			exit;
-		} else {
-			unset( $datafile['OptionsFramework-backup-validator'] ); // Now that we've checked it, we don't need the field anymore.
-		}
-
+	public function __construct () {
 
 		// Get the theme name from the database.
-		$optionsframework_data = get_option('options-framework-importer');
-		$optionsframework_name = $optionsframework_data['id'];
-		//$optionsframework_name = get_option( $optionsframework_name );
+		$of_options = get_option( 'optionsframework' );
+		$this->options_key = $of_options['id'];
+		$this->theme_options = get_option( $this->options_key );
 
-		// Update the settings in the database
-		if ( update_option( $optionsframework_name, $datafile ) ) {
+		add_filter( 'of_options', array( $this, 'add_options' ), 9999 );
 
-		// Redirect, add success flag to the URI
-			wp_redirect( admin_url( 'admin.php?page=' . $this->token . '&imported=true' ) );
-			exit;
-		} else {
-		// Errors: update fail
-			var_dump($optionsframework_name);
-			wp_redirect( admin_url( 'admin.php?page=' . $this->token . '&error=true' ) );
-			exit;
+		add_filter( 'optionsframework_import', array( $this, 'import_option_type' ), 10, 3 );
+		add_filter( 'optionsframework_export', array( $this, 'export_option_type' ), 10, 3 );
+		
+		add_action( 'sanitize_option_' . $this->options_key, array( $this, 'import_settings' ), 1 );
+
+		add_action( 'appearance_page_options-framework', array( $this, 'add_save_notice' ) );
+
+		if ( is_admin() ) {
+			add_action( 'plugins_loaded', array( $this, 'load_text_domain' ) );
 		}
 
-	} // End import()
+	}
 
-
-
-
-	/**
-	 * export()
-	 *
-	 * Export settings to a backup file.
-	 *
-	 * @since 1.0.0
-	 * @uses global $wpdb
+	
+	/*
+	 * Make Plugin Translation-ready
+	 * @since 1.0
 	 */
 
-	function export() {
-		global $wpdb;
-		check_admin_referer( 'OptionsFramework-backup-export' ); // Security check.
+	public function load_text_domain() {
+	   load_plugin_textdomain( 'options-framework-importer', false, dirname( plugin_basename( __FILE__ ) ) . '/languages/' );
+	}
 
-		$optionsframework_settings = get_option('options-framework-importer');
-		$database_options = get_option( $optionsframework_settings['id'] );
 
-		// Error trapping for the export.
-		if ( $database_options == '' ) {
-			wp_redirect( admin_url( 'admin.php?page=' . $this->token . '&error-export=true' ) );
-			return;
+	/*
+	 * Add import/export options to Theme Options Tab
+	 *
+	 * @param array $options
+	 * @return array
+	 *
+	 * @since 1.0.0
+	 */
+	public function add_options( $options ){
+		$options[] = array(
+			'name' => __( 'Import/Export', 'of_import_export' ),
+			'type' => 'heading'
+		);
+		$options[] = array(
+			'name' => __( 'Import Settings', 'of_import_export' ),
+			'id' => 'import_settings',
+			'rows' => 10,
+			'type' => 'import'
+	     );
+		$options[] = array(
+			'name' => __( 'Export Settings', 'of_import_export' ),
+			'desc' => __( 'Select all and copy to export your settings.', 'of_import_export'  ),
+			'id' => 'export_settings',
+			'type' => 'export'
+	     );
+		return $options;
+	}
+
+
+
+
+	/*
+	 * Define the import type
+	 * the markup is a little funny b/c we're sneaking an input into the description
+	 *
+	 * @param array $options
+	 * @return array
+	 *
+	 * @since 1.0.0
+	 */
+    public function import_option_type( $option_name, $option, $values ){
+
+		$output = sprintf( '<textarea name="%s[import_settings]" class="of-input" rows="10"></textarea></div><!--.controls-->', $this->options_key );
+
+		$desc = __( 'Paste your exported settings here. When you click "Import" your settings will be imported to this site.', 'of_import_export'  );
+		$value = esc_attr__( 'Import', 'of_import_export' );
+		$msg = esc_js( __( 'Click OK to import. All current theme settings will be overwritten!', 'of_import_export' ) );
+
+		$output .= sprintf( '<div class="explain">%s<p><input type="submit" name="of_import" class="button button-secondary" value="%s" onclick="return confirm( \'%s\' );" />', $desc, $value, $msg );
+				
+		return $output;
+		 
+    } 
+
+	/*
+	 * Define the export type
+	 *
+	 * @param array $options
+	 * @return array
+	 *
+	 * @since 1.0.0
+	 */
+    public function export_option_type( $option_name, $option, $values ){
+	
+		if ( $this->theme_options && is_array( $this->theme_options ) ) {
+			// Add the theme name
+			$this->theme_options['theme-name'] = $this->options_key;
+
+			// Generate the export data.
+			$val = base64_encode( maybe_serialize( (array)$this->theme_options ) );
+		} else {
+			$val = __( 'ERROR! You don\'t have any options to export. Trying saving your options first.', 'of_import_export' );
 		}
 
-		if ( ! $database_options ) { return; }
+		$output = '<textarea disabled="disabled" class="of-input" rows="10">' . esc_textarea( $val ) . '</textarea>';
+				
+		return $output;
+		 
+    } 
 
-		// Add our custom marker, to ensure only valid files are imported successfully.
-		$database_options['OptionsFramework-backup-validator'] = date( 'Y-m-d h:i:s' );
 
-		// Generate the export file.
-	    $output = json_encode( (array)$database_options );
+	/*
+	 * Import the settings
+	 * happens on options validation hook, but re-directs before OF's validation can run
+	 *
+	 * @param array $input
+	 * @return array
+	 *
+	 * @since 1.0.0
+	 */
+    public function import_settings( $input ){
 
-	    header( 'Content-Description: File Transfer' );
-	    header( 'Cache-Control: public, must-revalidate' );
-	    header( 'Pragma: hack' );
-	    header( 'Content-Type: text/plain' );
-	    header( 'Content-Disposition: attachment; filename="' . $this->token . '-' . date( 'Ymd-His' ) . '.json"' );
-	    header( 'Content-Length: ' . strlen( $output ) );
-	    echo $output;
-	    exit;
+		if ( isset( $input['import_settings'] ) && trim( $input['import_settings'] ) !== '' ){ 
 
-	} // End export()
+			// decode the pasted data
+			$data = (array) maybe_unserialize( base64_decode( $input['import_settings'] ) );
+
+			if( is_array( $data ) && isset( $data['theme-name'] ) && $this->options_key == $data['theme-name'] ){
+	
+				unset( $data['theme-name'] );
+
+				// Update the settings in the database
+				update_option( $this->options_key, $data );
+				update_option( 'of_import_happened', 'success' );
+
+			} else {
+
+				update_option( 'of_import_happened', 'fail' );
+			}
+
+			//remove_action( 'optionsframework_after_validate', array( 'Options_Framework_Admin', 'save_options_notice' ) );
+
+			/**
+			 * Redirect back to the settings page that was submitted
+			 */
+			$goback = add_query_arg( 'settings-updated', 'true',  wp_get_referer() );
+			wp_redirect( $goback );
+			exit;
+		
+		} 
+
+		return $input;
+
+    }
+
+
+
+	/*
+	 * Add notices for import success/failure
+	 * couldn't go traditional route since we're skipping the OF validation 
+	 *
+	 * @param array $input
+	 * @return array
+	 *
+	 * @since 1.0.0
+	 */
+	public function add_save_notice(){ 
+
+		$success = get_option( 'of_import_happened', false );
+		if( $success ){
+			
+			remove_filter( 'sanitize_option_' . $this->options_key, array( 'Options_Framework_Admin', 'validate_options' ) );
+			
+			if( $success === 'success' ) {
+				add_settings_error( 'options-framework', 'import_options', __( 'Options imported.', 'of_import_export' ), 'updated fade' );	
+			} else {
+				add_settings_error( 'options-framework', 'import_options_fail', __( 'Options could not be imported.', 'of_import_export' ), 'error' );
+			}
+		}
+		
+		delete_option( 'of_import_happened' );
+
+	}
 
 } // End Class
 
 endif;
 
 /**
- * Create $of_backup Object.
+ * Returns the main instance of OF_Import_Export to prevent the need to use globals.
  *
- * @since 1.0.0
- * @uses OptionsFramework_Backup
+ * @return OF_Import_Export
  */
+function OF_Import_Export() {
+	return OF_Import_Export::instance();
+}
 
-$of_backup = new OptionsFramework_Backup();
-$of_backup->init();
+// Launch the whole plugin
+OF_Import_Export();
 ?>
